@@ -33,6 +33,9 @@
 *.csv
 *.pdf
 *.log
+*.mat
+*.swp
+*.m~
 bake/
 gnuplot-5.2.2/
 netanim/
