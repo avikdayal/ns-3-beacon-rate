@@ -143,7 +143,7 @@ struct NodePos {
     return m_rxpriority;
   }
 
-std::vector <PacketInfo> PacketList;
+std::vector <PacketInfo *> PacketList;
 //std::vector <PacketInfo> hp_PacketList;
 std::map <uint32_t, PacketInfo *> hp_PacketList;
 std::map <uint32_t, PacketInfo *> hp_missedPacketList;
@@ -1219,13 +1219,13 @@ void BsmApplication::ReceiveWavePacket (Ptr<Socket> socket)
 
                   int receiverMoving = m_nodesMoving->at (rxNode->GetId ());
                   if (receiverMoving == 1){
-                    PacketInfo pinfo;
-                    pinfo.SetLagTime(Simulator::Now().GetMilliSeconds());//-tag.GetEmitTime()
-                    pinfo.SetSendPriority(tag.GetPrio());
-                    pinfo.SetRecvPriority(priority_hp);
-                    pinfo.m_msgId=tag.GetMsgId();
-                    pinfo.m_txNodeId=txNodeId;
-                    pinfo.m_rxNodeId=rxNode->GetId ();
+                    PacketInfo * pinfo = new PacketInfo();
+                    pinfo->SetLagTime(Simulator::Now().GetMilliSeconds());//-tag.GetEmitTime()
+                    pinfo->SetSendPriority(tag.GetPrio());
+                    pinfo->SetRecvPriority(priority_hp);
+                    pinfo->m_msgId=tag.GetMsgId();
+                    pinfo->m_txNodeId=txNodeId;
+                    pinfo->m_rxNodeId=rxNode->GetId ();
                     PacketList.push_back(pinfo);
                   }
 
@@ -1280,15 +1280,15 @@ void BsmApplication::ReceiveAdaptiveWavePacket (Ptr<Socket> socket)
 
                   int receiverMoving = m_nodesMoving->at (rxNode->GetId ());
                   if (receiverMoving == 1){
-                    PacketInfo pinfo;
+                    PacketInfo * pinfo = new PacketInfo();
                     //std::cout << "in adaptive received packet" << '\n';
-                    pinfo.SetLagTime(Simulator::Now().GetMilliSeconds()-tag.GetEmitTime());//-tag.GetEmitTime()
-                    pinfo.SetSendPriority(tag.GetPrio());
-                    pinfo.SetRecvPriority(priority_hp);
-                    pinfo.m_msgId=tag.GetMsgId();
-                    pinfo.m_txNodeId=txNodeId;
-                    pinfo.m_rxNodeId=rxNode->GetId ();
-                    pinfo.m_sysTime=Simulator::Now().GetSeconds();
+                    pinfo->SetLagTime(Simulator::Now().GetMilliSeconds()-tag.GetEmitTime());//-tag.GetEmitTime()
+                    pinfo->SetSendPriority(tag.GetPrio());
+                    pinfo->SetRecvPriority(priority_hp);
+                    pinfo->m_msgId=tag.GetMsgId();
+                    pinfo->m_txNodeId=txNodeId;
+                    pinfo->m_rxNodeId=rxNode->GetId ();
+                    pinfo->m_sysTime=Simulator::Now().GetSeconds();
 
                     //ttc code
                     double distSq = MobilityHelper::GetDistanceSquaredBetween (txNode, rxNode);
@@ -1306,11 +1306,11 @@ void BsmApplication::ReceiveAdaptiveWavePacket (Ptr<Socket> socket)
                     node_speed_rx = vel_rx.x * vel_rx.x + vel_rx.y * vel_rx.y + vel_rx.z * vel_rx.z;
                     double rel_vel=(double)(std::abs(node_speed-node_speed_rx));
                     ttc=std::sqrt(distSq/rel_vel);
-                    pinfo.m_txspeed=(double)node_speed;
-                    pinfo.m_rxspeed=(double)node_speed_rx;
+                    pinfo->m_txspeed=(double)node_speed;
+                    pinfo->m_rxspeed=(double)node_speed_rx;
                     //std::cout << "rx distance:" << distSq << " rx ttc:" << ttc << " relative velocity: "<< rel_vel << "tx velocity "<< node_speed <<"rx velocity "<< node_speed_rx << '\n';
-                    pinfo.m_ttc=ttc;
-                    pinfo.m_dist=distSq;
+                    pinfo->m_ttc=ttc;
+                    pinfo->m_dist=distSq;
                     //add in ttc
                     PacketList.push_back(pinfo);
                   }
@@ -1547,8 +1547,8 @@ void printAppStats(std::string CSVfileName3){
 
   double min_ttc;
 
-  std::map <uint32_t, PacketInfo *> hp_Vehiclelist;
-
+  //std::map <uint32_t, PacketInfo *> hp_Vehiclelist;
+  std::map <std::string, PacketInfo *> PacketListIndex;
 
   out << "hptx_count"<< "," << "lptx_count"<< "," << "hp2hp_count" << ","<< "hp_count" << "," << "lp_count" << "," << "hp2hp_delay" << "," << "hp_delay" << "," << "lp_delay" << std::endl;
 
@@ -1559,19 +1559,26 @@ void printAppStats(std::string CSVfileName3){
   out3 << "Msg ID" << ","<< "TxNode" <<","<< "hp2hp_count" << ","<< "hp_count" << "," << "lp_count" << "," << "hp2hp_delay_msg" << "," << "hp_delay_msg" << "," << "lp_delay_msg" << std::endl;
 
   //std::cout << "dropped packets" << dropped_packets<< '\n';
-  for (std::vector<PacketInfo>::iterator it = PacketList.begin() ; it != PacketList.end(); ++it){
+  for (std::vector<PacketInfo *>::iterator it = PacketList.begin() ; it != PacketList.end(); ++it){
+
+      //Create map going from vehicle id and message id to PacketList
+      std::stringstream ss;
+      ss << (*it)->m_msgId << '-' << (*it)->m_rxNodeId;
+      PacketListIndex[ss.str()]= *it;
+
+
       //std::cout << "Msg ID " << it->m_msgId << " TxNode "<< it->m_txNodeId << " RxNode " << it->m_rxNodeId << " TxPriority " << it->m_txpriority << " RxPriority " << it->m_rxpriority << " Rxtime " << it->m_lag_time<<'\n';
       //std::cout << "iterator:" << it << '\n';
       //std::cout << "hp packetlist end:" << hp_PacketList.end() << '\n';
-      out2 << it->m_msgId << "," << it->m_txNodeId<< "," << it->m_rxNodeId << ","<< it->m_txpriority << "," << it->m_rxpriority <<"," << it->m_lag_time << "," << it->m_ttc <<"," << it->m_dist <<"," << it->m_txspeed <<"," << it->m_rxspeed << "," << it->m_sysTime << std::endl;
+      out2 << (*it)->m_msgId << "," << (*it)->m_txNodeId<< "," << (*it)->m_rxNodeId << ","<< (*it)->m_txpriority << "," << (*it)->m_rxpriority <<"," << (*it)->m_lag_time << "," << (*it)->m_ttc <<"," << (*it)->m_dist <<"," << (*it)->m_txspeed <<"," << (*it)->m_rxspeed << "," << (*it)->m_sysTime << std::endl;
 
-      if(it->m_txpriority==5){
-        if(tempID<=it->m_msgId){
-          tempID=it->m_msgId;
+      if((*it)->m_txpriority==5){
+        if(tempID<=(*it)->m_msgId){
+          tempID=(*it)->m_msgId;
           hptx_count++;
         }
-        if(tempID_msg!=it->m_msgId){
-          tempID_msg=it->m_msgId;
+        if(tempID_msg!=(*it)->m_msgId){
+          tempID_msg=(*it)->m_msgId;
           hp2hp_delay_msg=hp2hp_delay_msg/((double)hp2hp_count_msg);
           hp_delay_msg=hp_delay_msg/((double)hp_count_msg);
           lp_delay_msg=lp_delay_msg/((double)lp_count_msg);
@@ -1585,7 +1592,7 @@ void printAppStats(std::string CSVfileName3){
           if(isnan(lp_delay_msg)){
             lp_delay_msg=-1;
           }
-          out3 << it->m_msgId << "," << it->m_txNodeId <<","<< hp2hp_count_msg << ","<< hp_count_msg << "," << lp_count_msg << "," << hp2hp_delay_msg << "," << hp_delay_msg << ","<<lp_delay_msg << std::endl;
+          out3 << (*it)->m_msgId << "," << (*it)->m_txNodeId <<","<< hp2hp_count_msg << ","<< hp_count_msg << "," << lp_count_msg << "," << hp2hp_delay_msg << "," << hp_delay_msg << ","<<lp_delay_msg << std::endl;
 
           hp2hp_count_msg=0;
           hp_count_msg=0;
@@ -1598,16 +1605,16 @@ void printAppStats(std::string CSVfileName3){
           min_ttc=0;
         }
 
-        if(it->m_rxpriority==it->m_txpriority){
+        if((*it)->m_rxpriority==(*it)->m_txpriority){
           hp2hp_count++;
           hp2hp_count_msg++;
-          hp2hp_delay=hp2hp_delay+it->m_lag_time;
-          hp2hp_delay_msg=hp2hp_delay_msg+it->m_lag_time;
-          if(min_ttc>it->m_ttc){
-              min_ttc=it->m_ttc;
+          hp2hp_delay=hp2hp_delay+(*it)->m_lag_time;
+          hp2hp_delay_msg=hp2hp_delay_msg+(*it)->m_lag_time;
+          if(min_ttc>(*it)->m_ttc){
+              min_ttc=(*it)->m_ttc;
           }
           if(min_ttc==0){
-            min_ttc=it->m_ttc;
+            min_ttc=(*it)->m_ttc;
           }
 
 
@@ -1615,23 +1622,23 @@ void printAppStats(std::string CSVfileName3){
         else{
           hp_count++;
           hp_count_msg++;
-          hp_delay=hp_delay+it->m_lag_time;
-          hp_delay_msg=hp_delay_msg+it->m_lag_time;
-          if(min_ttc>it->m_ttc){
-              min_ttc=it->m_ttc;
+          hp_delay=hp_delay+(*it)->m_lag_time;
+          hp_delay_msg=hp_delay_msg+(*it)->m_lag_time;
+          if(min_ttc>(*it)->m_ttc){
+              min_ttc=(*it)->m_ttc;
           }
           if(min_ttc==0){
-            min_ttc=it->m_ttc;
+            min_ttc=(*it)->m_ttc;
           }
         }
       }
       else{
-        if(tempID<=it->m_msgId){
-          tempID=it->m_msgId;
+        if(tempID<=(*it)->m_msgId){
+          tempID=(*it)->m_msgId;
           lptx_count++;
         }
-        if(tempID_msg!=it->m_msgId){
-          tempID_msg=it->m_msgId;
+        if(tempID_msg!=(*it)->m_msgId){
+          tempID_msg=(*it)->m_msgId;
           hp2hp_delay_msg=hp2hp_delay_msg/((double)hp2hp_count_msg);
           hp_delay_msg=hp_delay_msg/((double)hp_count_msg);
           lp_delay_msg=lp_delay_msg/((double)lp_count_msg);
@@ -1645,7 +1652,7 @@ void printAppStats(std::string CSVfileName3){
           if(isnan(lp_delay_msg)){
             lp_delay_msg=-1;
           }
-          out3 << it->m_msgId << "," << it->m_txNodeId <<","<< hp2hp_count_msg << ","<< hp_count_msg << "," << lp_count_msg << "," << hp2hp_delay_msg << "," << hp_delay_msg << ","<<lp_delay_msg << std::endl;
+          out3 << (*it)->m_msgId << "," << (*it)->m_txNodeId <<","<< hp2hp_count_msg << ","<< hp_count_msg << "," << lp_count_msg << "," << hp2hp_delay_msg << "," << hp_delay_msg << ","<<lp_delay_msg << std::endl;
 
           hp2hp_count_msg=0;
           hp_count_msg=0;
@@ -1659,13 +1666,13 @@ void printAppStats(std::string CSVfileName3){
         }
         lp_count++;
         lp_count_msg++;
-        lp_delay=lp_delay+it->m_lag_time;
-        lp_delay_msg=lp_delay_msg+it->m_lag_time;
-        if(min_ttc>it->m_ttc){
-            min_ttc=it->m_ttc;
+        lp_delay=lp_delay+(*it)->m_lag_time;
+        lp_delay_msg=lp_delay_msg+(*it)->m_lag_time;
+        if(min_ttc>(*it)->m_ttc){
+            min_ttc=(*it)->m_ttc;
         }
         if(min_ttc==0){
-          min_ttc=it->m_ttc;
+          min_ttc=(*it)->m_ttc;
         }
       }
 
@@ -1691,6 +1698,19 @@ void printAppStats(std::string CSVfileName3){
 
       for(std::vector<uint32_t>::iterator it_hp2 = it_hp->second->NodesInRange.begin() ; it_hp2 != it_hp->second->NodesInRange.end(); ++it_hp2){
         Nodes_recv[*it_hp2]=0;
+        std::stringstream ss;
+
+        ss << it_hp->second->m_msgId << '-' << *it_hp2;
+        if(PacketListIndex.find(ss.str()) != PacketListIndex.end()){
+          std::cout << "received message ID: " << ss.str() << '\n';
+          Nodes_recv[*it_hp2]=1;
+          out4 << it_hp->second->m_msgId << "," << it_hp->second->m_txNodeId<< "," << *it_hp2 << ","<< it_hp->second->TTCInRange[*it_hp2] << ","<< it_hp->second->m_sysTime <<","<< Nodes_recv[*it_hp2] << "," << it_hp->second->DistInRange[*it_hp2] << std::endl;
+        }
+        else{
+          out4 << it_hp->second->m_msgId << "," << it_hp->second->m_txNodeId<< "," << *it_hp2 << ","<< it_hp->second->TTCInRange[*it_hp2] << ","<< it_hp->second->m_sysTime <<","<< Nodes_recv[*it_hp2] << "," << it_hp->second->DistInRange[*it_hp2] << std::endl;
+        }
+
+        /* OLD CODE*//*
         for (std::vector<PacketInfo>::iterator it = PacketList.begin() ; it != PacketList.end(); ++it){
           if(it->m_msgId==it_hp->second->m_msgId){
             if(it->m_rxNodeId== *it_hp2){
@@ -1702,14 +1722,17 @@ void printAppStats(std::string CSVfileName3){
             }
           }
 
-        }
+        }*/
+
+
       }
-      for(std::vector<uint32_t>::iterator it_hp2 = it_hp->second->NodesInRange.begin() ; it_hp2 != it_hp->second->NodesInRange.end(); ++it_hp2){
+
+      /*for(std::vector<uint32_t>::iterator it_hp2 = it_hp->second->NodesInRange.begin() ; it_hp2 != it_hp->second->NodesInRange.end(); ++it_hp2){
           if(Nodes_recv[*it_hp2]==0){
             out4 << it_hp->second->m_msgId << "," << it_hp->second->m_txNodeId<< "," << *it_hp2 << ","<< it_hp->second->TTCInRange[*it_hp2] << ","<< it_hp->second->m_sysTime <<","<< Nodes_recv[*it_hp2] << "," << it_hp->second->DistInRange[*it_hp2] << std::endl;
             //Nodes_dropped[]
           }
-      }
+      }*/
     }
     if(sz!=0){
       std::cout << "size " << sz << '\n';
